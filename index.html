@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Stickman Election Simulator 2026</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #2c3e50; font-family: sans-serif; }
+        canvas { display: block; background: #ecf0f1; margin: 0 auto; border-bottom: 5px solid #bdc3c7; }
+        #ui {
+            position: absolute; top: 10px; left: 10px; 
+            background: rgba(255,255,255,0.9); padding: 15px; 
+            border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .step { margin-bottom: 5px; color: #7f8c8d; }
+        .active { color: #2ecc71; font-weight: bold; }
+        .done { color: #27ae60; text-decoration: line-through; }
+        #msg { position: absolute; bottom: 20%; width: 100%; text-align: center; font-size: 24px; color: #e74c3c; font-weight: bold; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <h3>Quy trình bầu cử</h3>
+    <div id="step1" class="step active">1. Xuất trình thẻ cử tri</div>
+    <div id="step2" class="step">2. Nhận phiếu bầu</div>
+    <div id="step3" class="step">3. Viết phiếu (Buồng kín)</div>
+    <div id="step4" class="step">4. Kiểm tra phiếu</div>
+    <div id="step5" class="step">5. Bỏ phiếu vào hòm</div>
+    <div id="step6" class="step">6. Đóng dấu xác nhận</div>
+</div>
+
+<div id="msg"></div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const msgDiv = document.getElementById('msg');
+
+canvas.width = window.innerWidth;
+canvas.height = 500;
+
+// Trạng thái game
+let currentStep = 1;
+const stations = [
+    { id: 1, x: 200, label: "Bàn 1: Tiếp đón", color: "#3498db" },
+    { id: 2, x: 400, label: "Bàn 2: Phát phiếu", color: "#9b59b6" },
+    { id: 3, x: 650, label: "Buồng viết phiếu", color: "#f1c40f" },
+    { id: 4, x: 900, label: "Bàn 3: Soát phiếu", color: "#e67e22" },
+    { id: 5, x: 1150, label: "Hòm Phiếu", color: "#e74c3c" },
+    { id: 6, x: 1400, label: "Bàn 4: Đóng dấu", color: "#2ecc71" }
+];
+
+let player = {
+    x: 50,
+    y: 350,
+    speed: 5,
+    width: 30,
+    height: 60
+};
+
+let keys = {};
+
+window.addEventListener('keydown', e => keys[e.code] = true);
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+function drawStickman(x, y) {
+    ctx.strokeStyle = "#2c3e50";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    // Đầu
+    ctx.arc(x, y - 50, 8, 0, Math.PI * 2);
+    // Thân
+    ctx.moveTo(x, y - 42); ctx.lineTo(x, y - 20);
+    // Tay
+    ctx.moveTo(x, y - 35); ctx.lineTo(x - 15, y - 25);
+    ctx.moveTo(x, y - 35); ctx.lineTo(x + 15, y - 25);
+    // Chân
+    ctx.moveTo(x, y - 20); ctx.lineTo(x - 10, y);
+    ctx.moveTo(x, y - 20); ctx.lineTo(x + 10, y);
+    ctx.stroke();
+}
+
+function update() {
+    // Di chuyển
+    if (keys['ArrowRight'] || keys['KeyD']) player.x += player.speed;
+    if (keys['ArrowLeft'] || keys['KeyA']) player.x -= player.speed;
+
+    // Giới hạn biên
+    if (player.x < 20) player.x = 20;
+
+    // Kiểm tra va chạm trạm
+    stations.forEach(s => {
+        if (Math.abs(player.x - s.x) < 30) {
+            if (currentStep === s.id) {
+                if (keys['Space']) {
+                    completeStep(s.id);
+                } else {
+                    showMessage(`Nhấn SPACE tại ${s.label}`);
+                }
+            } else if (currentStep < s.id) {
+                showMessage("Bạn chưa xong bước trước đó!");
+            }
+        }
+    });
+
+    draw();
+    requestAnimationFrame(update);
+}
+
+function completeStep(id) {
+    const el = document.getElementById(`step${id}`);
+    el.className = "step done";
+    currentStep++;
+    if (currentStep <= 6) {
+        document.getElementById(`step${currentStep}`).className = "step active";
+        showMessage("Tốt lắm! Tiếp tục đi nào.", "#27ae60");
+    } else {
+        showMessage("CHÚC MỪNG! BẠN ĐÃ HOÀN THÀNH BẦU CỬ!", "#2ecc71");
+    }
+}
+
+function showMessage(text, color = "#e74c3c") {
+    msgDiv.innerText = text;
+    msgDiv.style.color = color;
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Vẽ mặt đất
+    ctx.fillStyle = "#bdc3c7";
+    ctx.fillRect(0, 350, canvas.width, 150);
+
+    // Vẽ các trạm
+    stations.forEach(s => {
+        ctx.fillStyle = s.color;
+        ctx.fillRect(s.x - 40, 270, 80, 80); // Bàn
+        ctx.fillStyle = "#2c3e50";
+        ctx.font = "14px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(s.label, s.x, 260);
+        
+        // Vẽ số thứ tự trạm
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 20px Arial";
+        ctx.fillText(s.id, s.x, 315);
+    });
+
+    drawStickman(player.x, player.y);
+    
+    // Hướng dẫn di chuyển ban đầu
+    if (player.x < 100) {
+        ctx.fillStyle = "#7f8c8d";
+        ctx.fillText("Dùng phím mũi tên để di chuyển", 100, 420);
+    }
+}
+
+update();
+</script>
+</body>
+</html>
