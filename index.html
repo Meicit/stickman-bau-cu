@@ -1,1 +1,148 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Stickman Adventure - GitHub Pages</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #222; font-family: sans-serif; }
+        canvas { display: block; background: #87CEEB; margin: 0 auto; border: 2px solid #000; }
+        #ui { position: absolute; top: 10px; left: 10px; color: white; text-shadow: 1px 1px 2px black; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h2>Stickman Runner</h2>
+        <p>Dùng mũi tên <b>Trái/Phải</b> để đi, <b>Lên</b> để nhảy</p>
+    </div>
+    <canvas id="gameCanvas"></canvas>
 
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+canvas.width = 800;
+canvas.height = 400;
+
+// Cấu hình vật lý
+const gravity = 0.5;
+const friction = 0.8;
+
+// Đối tượng Stickman
+const player = {
+    x: 50,
+    y: 300,
+    width: 20,
+    height: 40,
+    velX: 0,
+    velY: 0,
+    speed: 4,
+    jumpStrength: 10,
+    grounded: false,
+    color: "#000"
+};
+
+// Danh sách các nền tảng (Platforms)
+const platforms = [
+    { x: 0, y: 380, width: 800, height: 20 }, // Sàn nhà
+    { x: 200, y: 300, width: 100, height: 10 },
+    { x: 400, y: 220, width: 100, height: 10 },
+    { x: 600, y: 150, width: 100, height: 10 }
+];
+
+const keys = {};
+
+// Lắng nghe sự kiện bàn phím
+window.addEventListener('keydown', (e) => keys[e.code] = true);
+window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+function drawStickman(x, y) {
+    ctx.strokeStyle = player.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    
+    // Đầu
+    ctx.arc(x + 10, y + 5, 5, 0, Math.PI * 2);
+    // Thân
+    ctx.moveTo(x + 10, y + 10);
+    ctx.lineTo(x + 10, y + 25);
+    // Tay
+    ctx.moveTo(x, y + 15);
+    ctx.lineTo(x + 20, y + 15);
+    // Chân
+    ctx.moveTo(x + 10, y + 25);
+    ctx.lineTo(x, y + 40);
+    ctx.moveTo(x + 10, y + 25);
+    ctx.lineTo(x + 20, y + 40);
+    
+    ctx.stroke();
+}
+
+function update() {
+    // Điều khiển
+    if (keys['ArrowUp'] || keys['KeyW']) {
+        if (player.grounded) {
+            player.velY = -player.jumpStrength;
+            player.grounded = false;
+        }
+    }
+    if (keys['ArrowRight'] || keys['KeyD']) {
+        if (player.velX < player.speed) player.velX++;
+    }
+    if (keys['ArrowLeft'] || keys['KeyA']) {
+        if (player.velX > -player.speed) player.velX--;
+    }
+
+    // Áp dụng vật lý
+    player.velX *= friction;
+    player.velY += gravity;
+
+    player.grounded = false;
+
+    // Kiểm tra va chạm với các nền tảng
+    for (let plat of platforms) {
+        ctx.fillStyle = "#654321";
+        ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+
+        if (player.x < plat.x + plat.width &&
+            player.x + player.width > plat.x &&
+            player.y < plat.y + plat.height &&
+            player.y + player.height > plat.y) {
+            
+            // Xử lý va chạm từ phía trên (đứng lên sàn)
+            if (player.velY > 0) {
+                player.grounded = true;
+                player.velY = 0;
+                player.y = plat.y - player.height;
+            }
+        }
+    }
+
+    player.x += player.velX;
+    player.y += player.velY;
+
+    // Giới hạn biên màn hình
+    if (player.x < 0) player.x = 0;
+    if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Vẽ lại các nền tảng
+    ctx.fillStyle = "#444";
+    platforms.forEach(p => ctx.fillRect(p.x, p.y, p.width, p.height));
+
+    // Vẽ stickman
+    drawStickman(player.x, player.y);
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
