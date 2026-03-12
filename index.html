@@ -2,159 +2,203 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Stickman Election Simulator 2026</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Giả Lập Bầu Cử 2026</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #2c3e50; font-family: sans-serif; }
-        canvas { display: block; background: #ecf0f1; margin: 0 auto; border-bottom: 5px solid #bdc3c7; }
-        #ui {
-            position: absolute; top: 10px; left: 10px; 
-            background: rgba(255,255,255,0.9); padding: 15px; 
-            border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        body { margin: 0; background: #1a1a1a; display: flex; flex-direction: column; align-items: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        canvas { background: #fdf2e9; border: 8px solid #34495e; box-shadow: 0 10px 30px rgba(0,0,0,0.5); cursor: none; }
+        #ui-panel {
+            color: white; width: 1000px; display: flex; justify-content: space-between; padding: 20px;
         }
-        .step { margin-bottom: 5px; color: #7f8c8d; }
-        .active { color: #2ecc71; font-weight: bold; }
-        .done { color: #27ae60; text-decoration: line-through; }
-        #msg { position: absolute; bottom: 20%; width: 100%; text-align: center; font-size: 24px; color: #e74c3c; font-weight: bold; pointer-events: none; }
+        .step-list { background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; width: 300px; }
+        .step { color: #95a5a6; margin: 5px 0; transition: 0.3s; }
+        .active { color: #f1c40f; font-weight: bold; transform: scale(1.05); }
+        .done { color: #2ecc71; text-decoration: line-through; opacity: 0.6; }
+        #dialog {
+            position: absolute; top: 400px; width: 600px; background: white;
+            padding: 15px; border-radius: 10px; border: 3px solid #3498db;
+            display: none; text-align: center; font-size: 18px;
+        }
     </style>
 </head>
 <body>
 
-<div id="ui">
-    <h3>Quy trình bầu cử</h3>
-    <div id="step1" class="step active">1. Xuất trình thẻ cử tri</div>
-    <div id="step2" class="step">2. Nhận phiếu bầu</div>
-    <div id="step3" class="step">3. Viết phiếu (Buồng kín)</div>
-    <div id="step4" class="step">4. Kiểm tra phiếu</div>
-    <div id="step5" class="step">5. Bỏ phiếu vào hòm</div>
-    <div id="step6" class="step">6. Đóng dấu xác nhận</div>
+<div id="ui-panel">
+    <div>
+        <h1 style="margin:0; color: #e74c3c;">BẦU CỬ QUỐC HỘI 2026</h1>
+        <p>Di chuyển bằng <b>A - D</b> hoặc <b>Mũi tên</b>. Nhấn <b>SPACE</b> để tương tác.</p>
+    </div>
+    <div class="step-list">
+        <div id="step1" class="step active">1. Xuất trình thẻ cử tri</div>
+        <div id="step2" class="step">2. Nhận phiếu bầu</div>
+        <div id="step3" class="step">3. Viết phiếu (Buồng kín)</div>
+        <div id="step4" class="step">4. Kiểm tra phiếu</div>
+        <div id="step5" class="step">5. Bỏ phiếu vào hòm</div>
+        <div id="step6" class="step">6. Đóng dấu xác nhận</div>
+    </div>
 </div>
 
-<div id="msg"></div>
-
+<div id="dialog"></div>
 <canvas id="gameCanvas"></canvas>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const msgDiv = document.getElementById('msg');
+const dialog = document.getElementById('dialog');
 
-canvas.width = window.innerWidth;
+canvas.width = 1000;
 canvas.height = 500;
 
-// Trạng thái game
+// Trạng thái nhân vật
+let player = { x: 50, y: 380, speed: 6, frame: 0 };
 let currentStep = 1;
-const stations = [
-    { id: 1, x: 200, label: "Bàn 1: Tiếp đón", color: "#3498db" },
-    { id: 2, x: 400, label: "Bàn 2: Phát phiếu", color: "#9b59b6" },
-    { id: 3, x: 650, label: "Buồng viết phiếu", color: "#f1c40f" },
-    { id: 4, x: 900, label: "Bàn 3: Soát phiếu", color: "#e67e22" },
-    { id: 5, x: 1150, label: "Hòm Phiếu", color: "#e74c3c" },
-    { id: 6, x: 1400, label: "Bàn 4: Đóng dấu", color: "#2ecc71" }
-];
-
-let player = {
-    x: 50,
-    y: 350,
-    speed: 5,
-    width: 30,
-    height: 60
-};
-
 let keys = {};
+
+// Định nghĩa các trạm (phòng bầu cử)
+const stations = [
+    { id: 1, x: 150, name: "BÀN ĐÓN TIẾP", color: "#3498db" },
+    { id: 2, x: 300, name: "BÀN PHÁT PHIẾU", color: "#9b59b6" },
+    { id: 3, x: 500, name: "BUỒNG KÍN", color: "#f1c40f", type: 'booth' },
+    { id: 4, x: 700, name: "BÀN SOÁT PHIẾU", color: "#e67e22" },
+    { id: 5, x: 850, name: "HÒM PHIẾU", color: "#e74c3c", type: 'box' },
+    { id: 6, x: 950, name: "BÀN ĐÓNG DẤU", color: "#2ecc71" }
+];
 
 window.addEventListener('keydown', e => keys[e.code] = true);
 window.addEventListener('keyup', e => keys[e.code] = false);
 
+function drawBackground() {
+    // Sàn gỗ
+    ctx.fillStyle = "#a0522d";
+    ctx.fillRect(0, 380, canvas.width, 120);
+    ctx.strokeStyle = "#8b4513";
+    for(let i=0; i<canvas.width; i+=50) {
+        ctx.strokeRect(i, 380, 50, 120);
+    }
+
+    // Tranh cổ động trên tường
+    ctx.fillStyle = "#c0392b";
+    ctx.fillRect(400, 50, 200, 100);
+    ctx.fillStyle = "white";
+    ctx.font = "bold 16px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("BÌNH HƯNG 2026", 500, 90);
+    ctx.font = "12px Arial";
+    ctx.fillText("NGÀY HỘI TOÀN DÂN", 500, 115);
+}
+
+function drawObjects() {
+    stations.forEach(s => {
+        ctx.textAlign = "center";
+        if (s.type === 'booth') {
+            // Vẽ buồng kín
+            ctx.fillStyle = "#2c3e50";
+            ctx.fillRect(s.x - 50, 200, 100, 180);
+            ctx.fillStyle = s.color;
+            ctx.fillRect(s.x - 45, 205, 90, 175);
+        } else if (s.type === 'box') {
+            // Vẽ hòm phiếu
+            ctx.fillStyle = "#f1c40f";
+            ctx.fillRect(s.x - 30, 310, 60, 70);
+            ctx.strokeRect(s.x - 30, 310, 60, 70);
+            ctx.fillStyle = "black";
+            ctx.fillRect(s.x - 15, 315, 30, 5); // Khe bỏ phiếu
+        } else {
+            // Vẽ bàn làm việc
+            ctx.fillStyle = "#bdc3c7";
+            ctx.fillRect(s.x - 40, 320, 80, 60);
+            ctx.fillStyle = s.color;
+            ctx.fillRect(s.x - 45, 315, 90, 10);
+        }
+        
+        ctx.fillStyle = "#2c3e50";
+        ctx.font = "bold 12px Arial";
+        ctx.fillText(s.name, s.x, 300);
+    });
+}
+
 function drawStickman(x, y) {
-    ctx.strokeStyle = "#2c3e50";
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 4;
     ctx.beginPath();
+    // Animation đi bộ đơn giản dựa trên frame
+    let walkCycle = Math.sin(player.frame * 0.2) * 10;
+    
     // Đầu
-    ctx.arc(x, y - 50, 8, 0, Math.PI * 2);
+    ctx.arc(x, y - 60, 10, 0, Math.PI * 2);
     // Thân
-    ctx.moveTo(x, y - 42); ctx.lineTo(x, y - 20);
+    ctx.moveTo(x, y - 50); ctx.lineTo(x, y - 20);
     // Tay
-    ctx.moveTo(x, y - 35); ctx.lineTo(x - 15, y - 25);
-    ctx.moveTo(x, y - 35); ctx.lineTo(x + 15, y - 25);
+    ctx.moveTo(x, y - 40); ctx.lineTo(x - 15, y - 30 + walkCycle);
+    ctx.moveTo(x, y - 40); ctx.lineTo(x + 15, y - 30 - walkCycle);
     // Chân
-    ctx.moveTo(x, y - 20); ctx.lineTo(x - 10, y);
-    ctx.moveTo(x, y - 20); ctx.lineTo(x + 10, y);
+    ctx.moveTo(x, y - 20); ctx.lineTo(x - 10 + walkCycle, y);
+    ctx.moveTo(x, y - 20); ctx.lineTo(x + 10 - walkCycle, y);
     ctx.stroke();
 }
 
 function update() {
-    // Di chuyển
-    if (keys['ArrowRight'] || keys['KeyD']) player.x += player.speed;
-    if (keys['ArrowLeft'] || keys['KeyA']) player.x -= player.speed;
+    if (keys['ArrowRight'] || keys['KeyD']) {
+        player.x += player.speed;
+        player.frame++;
+    }
+    if (keys['ArrowLeft'] || keys['KeyA']) {
+        player.x -= player.speed;
+        player.frame++;
+    }
 
     // Giới hạn biên
-    if (player.x < 20) player.x = 20;
+    player.x = Math.max(20, Math.min(980, player.x));
 
-    // Kiểm tra va chạm trạm
+    // Xử lý tương tác
+    let inRange = false;
     stations.forEach(s => {
-        if (Math.abs(player.x - s.x) < 30) {
+        if (Math.abs(player.x - s.x) < 40) {
+            inRange = true;
             if (currentStep === s.id) {
+                showDialog(`Nhấn <b>SPACE</b> để ${s.name.toLowerCase()}`);
                 if (keys['Space']) {
                     completeStep(s.id);
-                } else {
-                    showMessage(`Nhấn SPACE tại ${s.label}`);
                 }
             } else if (currentStep < s.id) {
-                showMessage("Bạn chưa xong bước trước đó!");
+                showDialog("Bạn cần hoàn thành bước trước đó!");
             }
         }
     });
 
-    draw();
+    if (!inRange) hideDialog();
+
+    render();
     requestAnimationFrame(update);
 }
 
 function completeStep(id) {
-    const el = document.getElementById(`step${id}`);
-    el.className = "step done";
+    document.getElementById(`step${id}`).className = "step done";
     currentStep++;
     if (currentStep <= 6) {
         document.getElementById(`step${currentStep}`).className = "step active";
-        showMessage("Tốt lắm! Tiếp tục đi nào.", "#27ae60");
+        keys['Space'] = false; // Tránh bấm giữ phím
     } else {
-        showMessage("CHÚC MỪNG! BẠN ĐÃ HOÀN THÀNH BẦU CỬ!", "#2ecc71");
+        alert("CHÚC MỪNG! Bạn đã hoàn thành nghĩa vụ công dân của mình.");
+        location.reload();
     }
 }
 
-function showMessage(text, color = "#e74c3c") {
-    msgDiv.innerText = text;
-    msgDiv.style.color = color;
+function showDialog(html) {
+    dialog.style.display = "block";
+    dialog.style.left = (canvas.offsetLeft + player.x - 300) + "px";
+    dialog.innerHTML = html;
 }
 
-function draw() {
+function hideDialog() {
+    dialog.style.display = "none";
+}
+
+function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Vẽ mặt đất
-    ctx.fillStyle = "#bdc3c7";
-    ctx.fillRect(0, 350, canvas.width, 150);
-
-    // Vẽ các trạm
-    stations.forEach(s => {
-        ctx.fillStyle = s.color;
-        ctx.fillRect(s.x - 40, 270, 80, 80); // Bàn
-        ctx.fillStyle = "#2c3e50";
-        ctx.font = "14px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText(s.label, s.x, 260);
-        
-        // Vẽ số thứ tự trạm
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 20px Arial";
-        ctx.fillText(s.id, s.x, 315);
-    });
-
+    drawBackground();
+    drawObjects();
     drawStickman(player.x, player.y);
-    
-    // Hướng dẫn di chuyển ban đầu
-    if (player.x < 100) {
-        ctx.fillStyle = "#7f8c8d";
-        ctx.fillText("Dùng phím mũi tên để di chuyển", 100, 420);
-    }
 }
 
 update();
